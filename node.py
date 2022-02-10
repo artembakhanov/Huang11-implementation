@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from helper import ranks, sample
 from message import Message, MessageType, NewTaskMessage, ResultMessage, NewNodeMessage
 from network import Network
-from result import Result
+from result import Result_, Result, Summary
 from task import Task
 
 
@@ -44,12 +44,20 @@ class Node:
         return math.sqrt(self._k)
 
     @property
+    def nk(self):
+        return self._n / math.sqrt(self._k)
+
+    @property
     def large(self):
         return len(self._data) >= self._n / self.sk
 
+    @property
+    def ns(self):
+        return len(self._data)
+
     def recv_message(self, message: Message, from_: 'Node'):
         if message.type == MessageType.NEW_TASK:
-            self.new_task(message.data['alpha'], message.data['epsilon'])
+            self.new_task(message.data)
         elif message.type == MessageType.RESULT:
             self.process_result(from_, message)
 
@@ -81,13 +89,13 @@ class Node:
         if not self.root and self._parent != from_:
             self._network.send_message(message, self, self._parent)
 
-    def new_task(self, alpha: float, epsilon: float):
-        p = 1 / epsilon / len(self._data) if self.large else self.sk / epsilon / self._n
-        message = NewTaskMessage(alpha, epsilon)
-        self._task = Task(alpha, p)
+    def new_task(self, eps: float):
+        p = 1 / eps / len(self._data) if self.large else self.sk / eps / self._n
+        message = NewTaskMessage(eps)
+        self._task = Task(p, eps)
 
         sampled_data = sample(self._data, self._local_ranks, p)
-        self._local_result = Result(*sampled_data)
+        self._local_result = Result(self.nk, eps, self.sk, Summary(self.ns, self.nk, eps, *sampled_data))
         self._task.add_results(self, self._local_result)
 
         if self.leaf and not self.root:
@@ -103,8 +111,12 @@ class Node:
         self._task.add_results(from_, message.data)
 
         if self._task.complete(len(self._children)):
-            # here we run the merge algorithm and send the result message to the parent
-            self._global_ranks, self._value_to_rank = self._task.global_ranks()
+            if self.root:
+                # here we run the merge algorithm and send the result message to the parent
+                self._global_ranks, self._value_to_rank = self._task.global_ranks()
+            else:
+                result = self._task.merge_results()
+                self._network.send_message(ResultMessage(result), self, self._parent)
 
     def rank_query(self, r: float):
         if self._global_ranks is None:

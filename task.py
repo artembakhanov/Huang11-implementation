@@ -2,17 +2,17 @@ from typing import Dict
 
 import numpy as np
 
-from result import Result
+from result import Result_, Result
 
 
 class Task:
-    def __init__(self, alpha: float, p: float):
-        self._alpha = alpha
+    def __init__(self, p: float, eps: float):
         self._p = p
+        self._eps = eps
         self._results: Dict['Node', 'Result'] = {}
 
     def __repr__(self) -> str:
-        return f"Task(alpha: {self.alpha}, p: {self.p})"
+        return f"Task(eps={self._eps}, p={self.p})"
 
     @property
     def p(self):
@@ -23,8 +23,8 @@ class Task:
         return 1 / self.p
 
     @property
-    def alpha(self):
-        return self._alpha
+    def eps(self):
+        return self._eps
 
     def node_result(self, node: 'Node'):
         if node not in self._results:
@@ -68,24 +68,13 @@ class Task:
         return res
 
     def global_ranks(self):
-        value_to_rank = {}
-        ranks = []
-        calc = set()
-        calc_ = []
-        for result in self._results.values():
-            for a in result.sampled_values:
-                if a not in calc:
-                    r = self.global_rank(a)
-                    value_to_rank[len(ranks)] = a
-                    ranks.append(r)
-                    calc.add(a)
-                    calc_.append(a)
-
-        # print("cock", np.array(calc_))
-        return np.array(ranks), value_to_rank
+        return Result.merge_non_empty(list(self._results.values()), merge_summaries=False).global_ranks()
 
     def add_results(self, node: 'Node', results: 'Result'):
         self._results[node] = results
+
+    def merge_results(self, merge_summaries=True):
+        return Result.merge_non_empty(list(self._results.values()), merge_summaries=merge_summaries)
 
     def complete(self, n: int):
         return len(self._results) == n + 1

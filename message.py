@@ -1,7 +1,7 @@
 import enum
 from abc import abstractmethod, ABC
 
-from result import Result
+from result import Result_, Result
 
 
 class MessageType(enum.IntEnum):
@@ -30,8 +30,8 @@ class Message(ABC):
 class NewTaskMessage(Message):
     type = MessageType.NEW_TASK
 
-    def __init__(self, alpha: float, epsilon: float):
-        self.data = dict(alpha=alpha, epsilon=epsilon)
+    def __init__(self, eps: float):
+        self.data = eps
 
     def __len__(self):
         return 1
@@ -44,7 +44,7 @@ class ResultMessage(Message):
         self.data = result
 
     def __len__(self):
-        return 1 + len(self.data.sampled_values)
+        return len(self.data)
 
 
 class NewNodeMessage(Message):
