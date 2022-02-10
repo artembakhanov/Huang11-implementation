@@ -52,12 +52,15 @@ class Result:
             summaries = self.summaries[cls]
             if cls == -1:
                 new_summaries, new_cls = Summary.merge_small(self._nk, *summaries)
-                self.summaries[cls] = new_summaries
+                if new_cls != -1:
+                    self.summaries[cls] = []
+                    self.summaries[new_cls].extend(new_summaries)
+
                 continue
 
             while len(summaries) > 1:
                 sum1, sum2 = summaries.pop(), summaries.pop()
-                new_summaries, new_cls = sum1.merge_large()
+                new_summaries, new_cls = sum1.merge_large(sum2)
                 self.summaries[new_cls].extend(new_summaries)
 
     def rank(self, a: float):
@@ -68,6 +71,14 @@ class Result:
 
         return res
 
+    def rank_a(self, a: np.ndarray):
+        res = np.zeros(a.shape, dtype=a.dtype)
+        for list_sum in self.summaries.values():
+            for sum_ in list_sum:
+                res += sum_.rank_a(a)
+
+        return res
+
     def global_ranks(self):
         value_to_rank = {}
         ranks = []
@@ -75,13 +86,21 @@ class Result:
         calc_ = []
         for list_sum in self.summaries.values():
             for sum_ in list_sum:
-                for a in sum_.sampled_values:
-                    if a not in calc:
-                        r = self.rank(a)
-                        value_to_rank[len(ranks)] = a
-                        ranks.append(r)
-                        calc.add(a)
-                        calc_.append(a)
+                s = sum_.sampled_values
+                r = self.rank_a(s)
+                for i in range(len(r)):
+                    if s[i] not in calc:
+                        value_to_rank[len(ranks)] = s[i]
+                        ranks.append(r[i])
+                        calc.add(s[i])
+
+                # for a in sum_.sampled_values:
+                #     if a not in calc:
+                #         r = self.rank(a)
+                #         value_to_rank[len(ranks)] = a
+                #         ranks.append(r)
+                #         calc.add(a)
+                #         calc_.append(a)
 
         return np.array(ranks), value_to_rank
 
@@ -91,7 +110,7 @@ class Result:
 
 class Summary:
     def __init__(self, ns: int, nk: float, eps: float, sampled_values: np.ndarray, ranks: np.ndarray):
-        self._sampled_values = sampled_values
+        self._sampled_values = np.append(np.sort(sampled_values), [np.NaN])
         self._ranks = ranks
         self._value_to_rank = dict(zip(sampled_values, ranks))
         self._ns: int = ns
@@ -115,7 +134,7 @@ class Summary:
 
     @property
     def sampled_values(self):
-        return self._sampled_values
+        return self._sampled_values[:-1]
 
     @property
     def ranks(self):
@@ -138,14 +157,26 @@ class Summary:
             # small-merge algorithm, return one summary
             for summary in args:
                 s, _ = sample(summary.sampled_values, summary.ranks, p)
-                for a in s:
-                    if a not in used:
-                        sampled_values.append(a)
-                        rank = sum([sum_.rank(a) for sum_ in args])
-                        ranks.append(rank)
-                        used.add(a)
 
-            new_summary = args[0].update(sampled_values, ranks, common_ns)
+                r = np.zeros(s.shape)
+                for sum_ in args:
+                    r += sum_.rank_a(s)
+
+                for i in range(len(r)):
+                    a = s[i]
+                    rank = r[i]
+                    sampled_values.append(a)
+                    ranks.append(rank)
+                    used.add(a)
+
+                # for a in s:
+                #     if a not in used:
+                #         sampled_values.append(a)
+                #         rank = sum([sum_.rank(a) for sum_ in args])
+                #         r.append(rank)
+                #         used.add(a)
+
+            new_summary = args[0].update(np.array(sampled_values), np.array(ranks), common_ns)
 
             return [new_summary], new_summary._cls
 
@@ -159,7 +190,7 @@ class Summary:
         p1 = self._ns / common_ns
         p2 = o._ns / common_ns
 
-        summaries = zip([p1, p2], [self, o])
+        summaries = list(zip([p1, p2], [self, o]))
 
         sampled_values = []
         ranks = []
@@ -168,44 +199,79 @@ class Summary:
         for p, summary in summaries:
             s, _ = sample(summary.sampled_values, summary.ranks, p)
 
-            for a in s:
-                if a not in used:
-                    sampled_values.append(a)
-                    rank = sum([sum_[1].rank(a) for sum_ in summaries])
-                    ranks.append(rank)
-                    used.add(a)
+            r = np.zeros(s.shape)
+            for sum_ in summaries:
+                r += sum_[1].rank_a(s)
+
+            for i in range(len(r)):
+                a = s[i]
+                rank = r[i]
+                sampled_values.append(a)
+                ranks.append(rank)
+                used.add(a)
+            # for a in s:
+            #     if a not in used:
+            #         sampled_values.append(a)
+            #         rank = sum([sum_[1].rank(a) for sum_ in summaries])
+            #         ranks.append(rank)
+            #         used.add(a)
 
         new_summary = self.update(sampled_values, ranks, common_ns)
 
         return [new_summary], new_summary._cls
 
     def update(self, new_sampled_values, new_ranks, new_ns):
-        return Summary(new_sampled_values, new_ranks, new_ns, self._nk, self._eps)
+        return Summary(new_ns, self._nk, self._eps, np.array(new_sampled_values), np.array(new_ranks))
 
     def r(self, a: float):
         if a not in self._value_to_rank:
-            raise Exception("No such value exist for this node")
+            return None
 
         return self._value_to_rank[a]
 
-    def pred(self, x: float):
-        s = self._sampled_values
+    def r_a(self, a: np.ndarray, other=np.NaN):
+        return np.array([self._value_to_rank.get(aa, other) for aa in a])
 
-        return s[s <= x].max()
+    def pred(self, x: float):
+        s = self._sampled_values[:-1]
+
+        i = np.searchsorted(s, x, side='right') - 1
+
+        return None if i == -1 else s[i]
+        # v = s[s <= x]
+        # return None if len(v) == 0 else v.max()
+
+    def pred_a(self, x: np.ndarray):
+        s = self._sampled_values
+        is_ = np.searchsorted(s, x, side='right') - 1
+        return s[is_]
 
     def rpred(self, x: float):
-        try:
-            pred = self.pred(x)
-        except ValueError:
+        pred = self.pred(x)
+        if pred is None:
             return -self.ips
 
         return self._value_to_rank[pred]
 
+    def rpred_a(self, x: np.ndarray):
+        pred = self.pred_a(x)
+
+        return self.r_a(pred, -self.ips)
+
     def rank(self, a: float):
-        try:
-            return self.r(a)
-        except:
-            return self.rpred(a) + self.ips
+        res = self.r(a)
+        if res is None:
+            res = self.rpred(a) + self.ips
+
+        return res
+
+    def rank_a(self, a: np.ndarray):
+        res = self.r_a(a)
+
+        other = a[np.isnan(res)]
+        res[np.isnan(res)] = self.rpred_a(other) + self.ips
+
+        return res
 
     def __len__(self):
-        return len(self._sampled_values)
+        return len(self._sampled_values) - 1

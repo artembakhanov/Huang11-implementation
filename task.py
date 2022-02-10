@@ -68,7 +68,8 @@ class Task:
         return res
 
     def global_ranks(self):
-        return Result.merge_non_empty(list(self._results.values()), merge_summaries=False).global_ranks()
+        res = Result.merge_non_empty(list(self._results.values()), merge_summaries=False)
+        return res.global_ranks()
 
     def add_results(self, node: 'Node', results: 'Result'):
         self._results[node] = results
