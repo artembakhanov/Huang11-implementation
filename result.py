@@ -1,6 +1,7 @@
 import math
 from collections import defaultdict
 from typing import List
+import sortednp as snp
 
 import numpy as np
 
@@ -110,7 +111,7 @@ class Result:
 
 class Summary:
     def __init__(self, ns: int, nk: float, eps: float, sampled_values: np.ndarray, ranks: np.ndarray):
-        self._sampled_values = np.append(np.sort(sampled_values), [np.NaN])
+        self._sampled_values = np.append(sampled_values, [np.NaN])
         self._ranks = ranks
         self._value_to_rank = dict(zip(sampled_values, ranks))
         self._ns: int = ns
@@ -148,14 +149,16 @@ class Summary:
     def merge_small(nk, *args: 'Summary'):
         common_ns = sum([summary.ns for summary in args])
 
-        sampled_values = []
-        ranks = []
+        sampled_values = np.zeros((0,))
+        ranks = np.zeros((0,))
         used = set()
         p = nk / common_ns
 
         if common_ns >= nk:
             # small-merge algorithm, return one summary
             for summary in args:
+                sampled_values_ = []
+                ranks_ = []
                 s, _ = sample(summary.sampled_values, summary.ranks, p)
 
                 r = np.zeros(s.shape)
@@ -165,9 +168,15 @@ class Summary:
                 for i in range(len(r)):
                     a = s[i]
                     rank = r[i]
-                    sampled_values.append(a)
-                    ranks.append(rank)
+                    sampled_values_.append(a)
+                    ranks_.append(rank)
                     used.add(a)
+
+                sampled_values, ind = snp.merge(sampled_values, np.array(sampled_values_), indices=True)
+                ranks_np = np.zeros(len(sampled_values))
+                ranks_np[ind[0]] = ranks
+                ranks_np[ind[1]] = ranks_
+                ranks = ranks_np
 
                 # for a in s:
                 #     if a not in used:
@@ -192,23 +201,32 @@ class Summary:
 
         summaries = list(zip([p1, p2], [self, o]))
 
-        sampled_values = []
-        ranks = []
+        sampled_values = np.zeros((0,))
+        ranks = np.zeros((0,))
         used = set()
 
         for p, summary in summaries:
             s, _ = sample(summary.sampled_values, summary.ranks, p)
 
+            sampled_values_ = []
+            ranks_ = []
             r = np.zeros(s.shape)
+
             for sum_ in summaries:
                 r += sum_[1].rank_a(s)
 
             for i in range(len(r)):
                 a = s[i]
                 rank = r[i]
-                sampled_values.append(a)
-                ranks.append(rank)
+                sampled_values_.append(a)
+                ranks_.append(rank)
                 used.add(a)
+
+            sampled_values, ind = snp.merge(sampled_values, np.array(sampled_values_), indices=True)
+            ranks_np = np.zeros(len(sampled_values))
+            ranks_np[ind[0]] = ranks
+            ranks_np[ind[1]] = ranks_
+            ranks = ranks_np
             # for a in s:
             #     if a not in used:
             #         sampled_values.append(a)
