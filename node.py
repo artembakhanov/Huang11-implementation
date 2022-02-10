@@ -118,11 +118,15 @@ class Node:
                 result = self._task.merge_results()
                 self._network.send_message(ResultMessage(result), self, self._parent)
 
-    def rank_query(self, r: float):
+    def rank_query(self, r: float, return_rank=False):
         if self._global_ranks is None:
             return 0
 
-        return self._value_to_rank[np.argmin((self._global_ranks - r) ** 2)]
+        ind = np.argmin((self._global_ranks - r) ** 2)
+        if return_rank:
+            return self._value_to_rank[ind], self._global_ranks[ind]
+        else:
+            return self._value_to_rank[ind]
 
     def r(self, a: float, node: 'Node' = None):
         if not self.has_task:
