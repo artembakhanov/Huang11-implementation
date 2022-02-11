@@ -12,13 +12,13 @@ def generate_tree(k: int, h: int = None):
     if h is None:
         return nx.minimum_spanning_tree(nx.random_tree(k))
 
-    if h > k:
+    if h > k - 1:
         raise Exception("Such tree does not exist")
 
     node = h
     paths = [list(range(0, h))]
 
-    while node < k:
+    while node < k - 1:
         path = choice(paths)
         ind = randint(1, min(len(path), h - 1))
         paths.append(path[:ind] + [node])
