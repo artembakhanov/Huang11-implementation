@@ -5,10 +5,34 @@ import numpy as np
 
 from network import Network
 from node import Node
+from random import randint, choice
 
 
-def generate_nodes(n: int, k: int, h: int, random_gen=np.random.rand, split_deviation=0.0):
-    tree = nx.minimum_spanning_tree(nx.random_tree(k))
+def generate_tree(k: int, h: int = None):
+    if h is None:
+        return nx.minimum_spanning_tree(nx.random_tree(k))
+
+    if h > k:
+        raise Exception("Such tree does not exist")
+
+    node = h
+    paths = [list(range(0, h))]
+
+    while node < k:
+        path = choice(paths)
+        ind = randint(1, min(len(path), h - 1))
+        paths.append(path[:ind] + [node])
+        node += 1
+
+    tree = nx.prefix_tree(paths)
+    tree.remove_node(-1)
+    tree = tree.to_undirected()
+
+    return tree
+
+
+def generate_nodes(n: int, k: int, h: int = None, random_gen=np.random.rand, split_deviation=0.0):
+    tree = generate_tree(k, h)
     # tree = nx.balanced_tree(math.ceil(k ** (1 / h)), h)
     height = max(nx.shortest_path_length(tree, source=0).values())
 
@@ -25,7 +49,9 @@ def generate_nodes(n: int, k: int, h: int, random_gen=np.random.rand, split_devi
     root = Node(network, data_split[0])
     nodes = {0: root}
 
-    for start, end in bfs[:k-1]:
+    for start, end in bfs[:k - 1]:
+        if end == -1:
+            continue
         nodes[end] = nodes[start].add_child(data_split[end])
 
     return network, root, data, height
