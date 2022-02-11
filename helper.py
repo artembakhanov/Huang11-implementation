@@ -15,3 +15,11 @@ def sample(a: np.ndarray, a_ranks: np.ndarray, p: float):
 
     ind = np.random.random_sample(a.size) <= p
     return a[ind], a_ranks[ind]
+
+
+def edges_union(edges):
+    children = {}
+    for k, v in edges:
+        children.setdefault(k, []).append(v)
+
+    return children

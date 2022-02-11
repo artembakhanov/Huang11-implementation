@@ -6,6 +6,7 @@ import sortednp as snp
 import numpy as np
 
 from helper import sample
+from hirola import HashTable
 
 
 class Result_:
@@ -15,7 +16,20 @@ class Result_:
         self.value_to_rank = dict(zip(sampled_values, ranks))
 
 
-class Result:
+class BaseResult:
+    pass
+
+
+class SlaveResult(BaseResult):
+    def __init__(self, data: np.ndarray):
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+
+
+class Result(BaseResult):
     def __init__(self, nk: float, eps: float, sk: float, *summaries: 'Summary'):
         self._nk = nk
         self._eps = eps
@@ -113,7 +127,8 @@ class Summary:
     def __init__(self, ns: int, nk: float, eps: float, sampled_values: np.ndarray, ranks: np.ndarray):
         self._sampled_values = np.append(sampled_values, [np.NaN])
         self._ranks = ranks
-        self._value_to_rank = dict(zip(sampled_values, ranks))
+        # self._value_to_ind = HashTable(len(sampled_values) * 1.25, np.float)  # dict(zip(sampled_values, ranks))
+        # self._rank_ind = self._value_to_ind.add(sampled_values)
         self._ns: int = ns
         self._nk: float = nk
         self._kn: float = 1 / self._nk
@@ -154,42 +169,44 @@ class Summary:
         used = set()
         p = nk / common_ns
 
-        if common_ns >= nk:
-            # small-merge algorithm, return one summary
-            for summary in args:
-                sampled_values_ = []
-                ranks_ = []
+        large = common_ns >= nk
+
+        # small-merge algorithm, return one summary
+        for summary in args:
+            sampled_values_ = []
+            ranks_ = []
+            if large:
                 s, _ = sample(summary.sampled_values, summary.ranks, p)
+            else:
+                s = summary.sampled_values
 
-                r = np.zeros(s.shape)
-                for sum_ in args:
-                    r += sum_.rank_a(s)
+            r = np.zeros(s.shape)
+            for sum_ in args:
+                r += sum_.rank_a(s, sum_ == summary)
 
-                for i in range(len(r)):
-                    a = s[i]
-                    rank = r[i]
-                    sampled_values_.append(a)
-                    ranks_.append(rank)
-                    used.add(a)
+            for i in range(len(r)):
+                a = s[i]
+                rank = r[i]
+                sampled_values_.append(a)
+                ranks_.append(rank)
+                used.add(a)
 
-                sampled_values, ind = snp.merge(sampled_values, np.array(sampled_values_), indices=True)
-                ranks_np = np.zeros(len(sampled_values))
-                ranks_np[ind[0]] = ranks
-                ranks_np[ind[1]] = ranks_
-                ranks = ranks_np
+            sampled_values, ind = snp.merge(sampled_values, np.array(sampled_values_), indices=True)
+            ranks_np = np.zeros(len(sampled_values))
+            ranks_np[ind[0]] = ranks
+            ranks_np[ind[1]] = ranks_
+            ranks = ranks_np
 
-                # for a in s:
-                #     if a not in used:
-                #         sampled_values.append(a)
-                #         rank = sum([sum_.rank(a) for sum_ in args])
-                #         r.append(rank)
-                #         used.add(a)
+            # for a in s:
+            #     if a not in used:
+            #         sampled_values.append(a)
+            #         rank = sum([sum_.rank(a) for sum_ in args])
+            #         r.append(rank)
+            #         used.add(a)
 
-            new_summary = args[0].update(np.array(sampled_values), np.array(ranks), common_ns)
+        new_summary = args[0].update(np.array(sampled_values), np.array(ranks), common_ns)
 
-            return [new_summary], new_summary._cls
-
-        return args, -1  # the same list of summaries
+        return [new_summary], new_summary._cls
 
     def merge_large(self, o: 'Summary'):
         assert self._cls == o._cls
@@ -213,7 +230,7 @@ class Summary:
             r = np.zeros(s.shape)
 
             for sum_ in summaries:
-                r += sum_[1].rank_a(s)
+                r += sum_[1].rank_a(s, summary == sum_)
 
             for i in range(len(r)):
                 a = s[i]
@@ -271,10 +288,19 @@ class Summary:
 
         return self._value_to_rank[pred]
 
-    def rpred_a(self, x: np.ndarray):
-        pred = self.pred_a(x)
+    def rpred_a(self, x: np.ndarray, own=False):
+        # pred = self.pred_a(x)
+        #
+        # return self.r_a(pred, -self.ips)
+        s = self._sampled_values
+        # ind_present = self._value_to_ind.contains(x)
 
-        return self.r_a(pred, -self.ips)
+        is_ = (np.searchsorted(s, x, side='right') - 1)
+        ranks = self._ranks[is_].astype(float)
+        ranks[is_ == -1] = -self.ips
+        # ranks[ind_present] -= self.ips
+
+        return ranks
 
     def rank(self, a: float):
         res = self.r(a)
@@ -283,12 +309,12 @@ class Summary:
 
         return res
 
-    def rank_a(self, a: np.ndarray):
-        res = self.r_a(a)
-
-        other = a[np.isnan(res)]
-        res[np.isnan(res)] = self.rpred_a(other) + self.ips
-
+    def rank_a(self, a: np.ndarray, own=False):
+        # res = self.r_a(a)
+        #
+        # other = a[np.isnan(res)]
+        # res[np.isnan(res)] = self.rpred_a(other) + self.ips
+        res = self.rpred_a(a) + (0.0 if own else self.ips)
         return res
 
     def __len__(self):

@@ -9,10 +9,14 @@ class Task:
     def __init__(self, p: float, eps: float):
         self._p = p
         self._eps = eps
-        self._results: Dict['Node', 'Result'] = {}
+        self._results: Dict['Node', 'BaseResult'] = {}
 
     def __repr__(self) -> str:
         return f"Task(eps={self._eps}, p={self.p})"
+
+    @property
+    def results(self):
+        return list(self._results.values())
 
     @property
     def p(self):
@@ -71,7 +75,7 @@ class Task:
         res = Result.merge_non_empty(list(self._results.values()), merge_summaries=False)
         return res.global_ranks()
 
-    def add_results(self, node: 'Node', results: 'Result'):
+    def add_results(self, node: 'Node', results: 'BaseResult'):
         self._results[node] = results
 
     def merge_results(self, merge_summaries=True):

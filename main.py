@@ -1,23 +1,20 @@
-from node import Node, Network, ranks
+from generator import generate_nodes
+from node import SuperNode, Network, ranks
 import numpy as np
 
-n = 10_000
-k = 4
-data = np.random.standard_normal(n)
-split_ind = np.linspace(0, n, k + 1)[1: -1] + np.random.rand(k - 1) * n // 2
-split_ind = split_ind.astype(int)
-data1, data2, data3, data4 = np.split(data, split_ind)
+n = 10_000_000
+k = 8196
 
-network = Network(verbose=False)
-node_root = Node(network, data1)
-node1 = node_root.add_child(data2)
-node2 = node_root.add_child(data3)
-node3 = node_root.add_child(data4)
-# node = Node(network, np.array([1, 1, 1, 1, 1]))
+network, node_root, data, height = generate_nodes(n, k, 1000, split_deviation=0.0, random_gen=np.random.standard_normal,
+                                                  graph_partition=True)
+print(f"height: {height}")
+# data = np.sort(data)
 
-data = np.sort(data)
-i = 1000
-print("orig:", data[i])
+q = 0.25
+i = q * n
+per = np.percentile(data, q * 100)
+print("orig rank:", i)
+print("orig:", per)
 
 # node_root.new_task(0.4, 0.5)
 # print(node_root.rank_query(i))
@@ -25,13 +22,22 @@ print("orig:", data[i])
 # print(network.stat)
 # network.reset()
 
-for eps in np.arange(0.001, 0.5, 0.05):
-    node_root.new_task(eps)
-    print("res: ", node_root.rank_query(i))
-    print("res ind:", np.where(data == node_root.rank_query(i)))
-    print("stat:", network.stat)
+eps = 0.0001
+print(f"max e should be {eps * n}")
 
-    network.reset()
+node_root.new_task(eps)
+print("res: ", node_root.rank_query(i))
+print("res rank:", node_root.rank_query(i, return_rank=True)[1])
+print("stat:", network.stat)
+
+# for eps in np.logspace(-4, -2, 50):
+#     node_root.new_task(eps)
+#     print(node_root._task._p)
+#     print("res: ", node_root.rank_query(i))
+#     print("res ind:", np.where(data == node_root.rank_query(i)))
+#     print("stat:", network.stat)
+#
+#     network.reset()
 
 # print(node_root)
 # print(node1)
