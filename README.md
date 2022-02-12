@@ -2,6 +2,7 @@
 #### Author: Artem Bakhanov. [email](mailto:a.bahanov@innopolis.university)
 This project is Assignment 1 of STDS course at Innopolis University.
 ## Project structure
+If you just want to see that the algorithm is working go to [example.ipynb](./example.ipynb).
 ```
 .
 ├── README.md                       # project description      
