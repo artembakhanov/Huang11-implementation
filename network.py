@@ -4,12 +4,15 @@ from message import Message, MessageType
 class Network:
     def __init__(self, verbose=False):
         self.all_stats = 0
+        self.non_system_stats = 0
 
         self.stat = dict(zip(MessageType, [0] * len(MessageType)))
         self.verbose = verbose
 
     def send_message(self, message: Message, from_: 'Node', to: 'Node'):
         self.all_stats += len(message)
+        if message.type > 0:
+            self.non_system_stats += len(message)
         self.stat[message.type] += len(message)
         to.recv_message(message, from_)
 
@@ -18,6 +21,7 @@ class Network:
 
     def reset(self):
         self.all_stats = 0
+        self.non_system_stats = 0
 
         for k in self.stat.keys():
             self.stat[k] = 0

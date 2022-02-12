@@ -111,7 +111,7 @@ class SlaveNode(BasicNode):
 class SlaveNodes:
     def __init__(self, network: Network, data: List[np.ndarray]):
         self._root = SlaveNode(network, data[0], None)
-        self._ns = sum([len(data_) for data_ in data])
+        self._ns = len(data[0])
 
         for data_ in data[1:]:
             self.add_node(data_)
@@ -168,7 +168,7 @@ class SuperNode(BasicNode):
 
     @property
     def large(self):
-        return self.ns >= self._n / self.sk
+        return self.ns >= self.nk
 
     @property
     def ns(self):

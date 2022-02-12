@@ -153,13 +153,11 @@ def partition(tree: nx.Graph):
     for i in range(len(components)):
         graph.nodes[i]["nodes"] = components[i]
 
-    print("parents:", parents)
-    print("ancestors:", ancestors)
-    print("super parents:", super_parents)
     return graph
 
 
-def generate_nodes(n: int, k: int, h: int = None, random_gen=np.random.rand, split_deviation=0.0, graph_partition=True):
+def generate_nodes(n: int, k: int, h: int = None, data=None, random_gen=np.random.rand, split_deviation=0.0,
+                   graph_partition=True):
     tree = generate_tree(k, h)
     # tree = nx.balanced_tree(math.ceil(k ** (1 / h)), h)
     height = max(nx.shortest_path_length(tree, source=0).values()) + 1
@@ -167,9 +165,9 @@ def generate_nodes(n: int, k: int, h: int = None, random_gen=np.random.rand, spl
     if graph_partition:
         tree = partition(tree)
 
-    print(nx.to_dict_of_dicts(tree))
 
-    data = random_gen(n)
+    if data is None:
+        data = random_gen(n)
 
     split_ind = np.linspace(0, n, k + 1)[1: -1] + np.random.normal(0.0, split_deviation)
     split_ind = split_ind.astype(int)

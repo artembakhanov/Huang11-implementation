@@ -10,7 +10,7 @@ class MessageType(enum.IntEnum):
     NEW_NODE = -1
     NEW_TASK = 0
     RESULT = 1
-    NEW_SUPER_NODE_TASK = 2
+    NEW_SUPER_NODE_TASK = -2
     NEW_SUPER_NODE_AGGREGATE = 3
     SUPER_NODE_TASK_RESULT = 4
     SUPER_NODE_AGGREGATE_RESULT = 5
@@ -60,7 +60,7 @@ class NewAggregateMessage(Message):
         self.data = data
 
     def __len__(self):
-        return 1
+        return len(self.data)
 
 
 class SuperNodeTaskResultMessage(Message):
@@ -80,7 +80,7 @@ class AggregateResultMessage(Message):
         self.data = ranks
 
     def __len__(self):
-        return 1
+        return len(self.data)
 
 
 class ResultMessage(Message):

@@ -163,6 +163,8 @@ class Summary:
     @staticmethod
     def merge_small(nk, *args: 'Summary'):
         common_ns = sum([summary.ns for summary in args])
+        if common_ns == 0:
+            return [], -1
 
         sampled_values = np.zeros((0,))
         ranks = np.zeros((0,))
@@ -297,7 +299,7 @@ class Summary:
 
         is_ = (np.searchsorted(s, x, side='right') - 1)
         ranks = self._ranks[is_].astype(float)
-        ranks[is_ == -1] = -self.ips
+        ranks[is_ == -1] = 0.0 if own else -self.ips
         # ranks[ind_present] -= self.ips
 
         return ranks
@@ -314,6 +316,8 @@ class Summary:
         #
         # other = a[np.isnan(res)]
         # res[np.isnan(res)] = self.rpred_a(other) + self.ips
+        if len(self.sampled_values) == 0:
+            return 0.0
         res = self.rpred_a(a) + (0.0 if own else self.ips)
         return res
 
